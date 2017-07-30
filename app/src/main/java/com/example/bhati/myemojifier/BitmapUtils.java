@@ -51,6 +51,7 @@ public class BitmapUtils {
         int imageWidth=options.outWidth;
 
         int scaleFactor=Math.min(imageHeight/displayHeight,imageWidth/displayWidth);
+        options.inJustDecodeBounds=false;
         options.inSampleSize=scaleFactor;
         return BitmapFactory.decodeFile(tempPhotoPath);
     }

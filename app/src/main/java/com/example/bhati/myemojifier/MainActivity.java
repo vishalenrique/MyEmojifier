@@ -5,6 +5,8 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.graphics.Bitmap;
+import android.graphics.Matrix;
+import android.media.ExifInterface;
 import android.net.Uri;
 import android.provider.MediaStore;
 import android.support.annotation.NonNull;
@@ -46,6 +48,7 @@ public class MainActivity extends AppCompatActivity {
     private String privateImagePath;
     private Bitmap resultantBitmap;
     private boolean isSaved;
+    private ExifInterface exifInterface;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -106,6 +109,11 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         if(requestCode==CAPTURE_PICTURE_REQUEST_ID && resultCode==RESULT_OK){
+            try {
+                exifInterface=new ExifInterface(tempPhotoPath);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
             processAndEmojify();
         }else{
             BitmapUtils.deleteTempFile(tempPhotoPath);
@@ -123,9 +131,55 @@ public class MainActivity extends AppCompatActivity {
 
         resultantBitmap=BitmapUtils.rescaleImage(this,tempPhotoPath);
 
+        int orientation=exifInterface.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL);
+
+        resultantBitmap=rotateBitmap(resultantBitmap,orientation);
+
         resultantBitmap=Emojify.emojifyme(this,resultantBitmap);
 
         imageView.setImageBitmap(resultantBitmap);
+    }
+
+    private Bitmap rotateBitmap(Bitmap bitmap, int orientation) {
+        Matrix matrix = new Matrix();
+        switch (orientation) {
+            case ExifInterface.ORIENTATION_NORMAL:
+                return bitmap;
+            case ExifInterface.ORIENTATION_FLIP_HORIZONTAL:
+                matrix.setScale(-1, 1);
+                break;
+            case ExifInterface.ORIENTATION_ROTATE_180:
+                matrix.setRotate(180);
+                break;
+            case ExifInterface.ORIENTATION_FLIP_VERTICAL:
+                matrix.setRotate(180);
+                matrix.postScale(-1, 1);
+                break;
+            case ExifInterface.ORIENTATION_TRANSPOSE:
+                matrix.setRotate(90);
+                matrix.postScale(-1, 1);
+                break;
+            case ExifInterface.ORIENTATION_ROTATE_90:
+                matrix.setRotate(90);
+                break;
+            case ExifInterface.ORIENTATION_TRANSVERSE:
+                matrix.setRotate(-90);
+                matrix.postScale(-1, 1);
+                break;
+            case ExifInterface.ORIENTATION_ROTATE_270:
+                matrix.setRotate(-90);
+                break;
+            default:
+                return bitmap;
+        }
+        try {
+            Bitmap bmRotated = Bitmap.createBitmap(bitmap, 0, 0, bitmap.getWidth(), bitmap.getHeight(), matrix, true);
+            bitmap.recycle();
+            return bmRotated;
+        } catch (OutOfMemoryError e) {
+            e.printStackTrace();
+            return null;
+        }
     }
 
     @OnClick(R.id.saveButton)
